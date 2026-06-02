@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Barevné značení rezistorů</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0f0f0f; --surface:#1a1a1a; --surface2:#242424; --border:#2e2e2e;
+  --accent:#f5c842; --accent2:#e05c3a; --text:#f0ede6; --muted:#888;
+  --green:#4caf7d; --red:#e05c3a; --blue:#4488ff; --purple:#a855f7;
+}
+*{ box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; font-size:15px; line-height:1.65; min-height:100vh; }
+header { background:var(--surface); border-bottom:1px solid var(--border); padding:2rem 2rem 0; }
+header h1 { font-family:'Space Mono',monospace; font-size:clamp(1rem,3vw,1.5rem); font-weight:700; color:var(--accent); letter-spacing:-0.5px; margin-bottom:0.25rem; }
+header p { color:var(--muted); font-size:13px; margin-bottom:1.25rem; }
+.tabs { display:flex; gap:0; flex-wrap:wrap; }
+.tab-btn { padding:0.6rem 1rem; border:1px solid var(--border); border-bottom:none; border-radius:6px 6px 0 0; background:transparent; color:var(--muted); font-family:'DM Sans',sans-serif; font-size:12.5px; cursor:pointer; margin-right:3px; margin-top:4px; transition:all 0.15s; white-space:nowrap; }
+.tab-btn:hover { color:var(--text); background:var(--surface2); }
+.tab-btn.active { background:var(--bg); color:var(--accent); border-color:var(--border); font-weight:600; }
+.tab-content { display:none; padding:2rem; max-width:900px; }
+.tab-content.active { display:block; }
+
+/* Resistor visual */
+.res-wrap { display:flex; align-items:center; margin:1.25rem 0; }
+.wire { flex:1; height:2px; background:#555; }
+.res-body { background:linear-gradient(180deg,#d4b97a 0%,#c8a85a 40%,#d4b97a 100%); border-radius:10px; padding:12px 10px; display:flex; align-items:center; gap:6px; min-width:180px; justify-content:center; box-shadow:0 2px 10px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.15); }
+.stripe { width:14px; height:40px; border-radius:2px; flex-shrink:0; box-shadow:1px 0 2px rgba(0,0,0,0.3); }
+.gap-sm { width:8px; }
+.gap-xs { width:3px; }
+.stripe-row { display:flex; gap:6px; justify-content:center; margin-top:0.5rem; align-items:flex-start; flex-wrap:wrap; }
+.stripe-col { display:flex; flex-direction:column; align-items:center; }
+.stripe-col .mini { width:14px; height:16px; border-radius:2px; }
+.stripe-col .lbl { font-size:10px; color:var(--muted); margin-top:3px; text-align:center; line-height:1.4; }
+
+/* Result pill */
+.result-pill { display:inline-flex; align-items:center; gap:8px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:0.7rem 1.25rem; margin-top:0.75rem; flex-wrap:wrap; }
+.result-pill .val { font-family:'Space Mono',monospace; font-size:1.3rem; color:var(--accent); }
+.result-pill .tol { font-size:13px; color:var(--muted); }
+.result-pill .tempco { font-size:13px; color:var(--purple); }
+
+/* Cards */
+.card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:1.5rem; margin-bottom:1.25rem; }
+.card h2 { font-size:1rem; font-weight:600; margin-bottom:0.75rem; color:var(--accent); font-family:'Space Mono',monospace; }
+
+/* Info / warning boxes */
+.info-box { border-radius:8px; padding:1rem 1.25rem; font-size:14px; margin-bottom:1rem; line-height:1.7; }
+.info-box.yellow { background:rgba(245,200,66,0.08); border-left:3px solid var(--accent); }
+.info-box.blue   { background:rgba(68,136,255,0.08); border-left:3px solid var(--blue); }
+.info-box.green  { background:rgba(76,175,125,0.08); border-left:3px solid var(--green); }
+.info-box.purple { background:rgba(168,85,247,0.08); border-left:3px solid var(--purple); }
+.warn-box { background:rgba(224,92,58,0.1); border:1px solid var(--red); border-radius:8px; padding:1rem 1.25rem; font-size:14px; margin:1rem 0; line-height:1.7; }
+.warn-box strong { color:var(--red); }
+
+/* Story */
+.story-banner { background:var(--surface2); border-left:3px solid var(--accent); border-radius:0 8px 8px 0; padding:1rem 1.25rem; font-size:14px; margin-bottom:1.25rem; line-height:1.7; }
+.steps { display:flex; flex-direction:column; gap:0.75rem; }
+.step { display:flex; gap:12px; align-items:flex-start; }
+.step-num { background:var(--accent); color:#000; font-family:'Space Mono',monospace; font-size:12px; font-weight:700; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
+.step p { font-size:14px; line-height:1.6; }
+.note { font-size:13px; color:var(--muted); margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border); }
+
+/* Compare grid */
+.compare-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin:1rem 0; }
+.compare-card { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:1rem; }
+.compare-card h3 { font-family:'Space Mono',monospace; font-size:12px; margin-bottom:0.5rem; }
+.compare-card h3.c4 { color:var(--accent); }
+.compare-card h3.c5 { color:var(--blue); }
+.compare-card h3.c6 { color:var(--purple); }
+.compare-card ul { font-size:13px; color:var(--muted); padding-left:1.1rem; line-height:1.8; }
+.compare-card ul li strong { color:var(--text); }
+
+/* Band structure visual */
+.band-struct { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:0.5rem 0; }
+.band-pill { font-size:11px; font-family:'Space Mono',monospace; padding:3px 9px; border-radius:99px; }
+.bp-digit  { background:rgba(245,200,66,0.15); color:var(--accent); border:1px solid rgba(245,200,66,0.3); }
+.bp-mult   { background:rgba(68,136,255,0.15); color:var(--blue); border:1px solid rgba(68,136,255,0.3); }
+.bp-tol    { background:rgba(76,175,125,0.15); color:var(--green); border:1px solid rgba(76,175,125,0.3); }
+.bp-tc     { background:rgba(168,85,247,0.15); color:var(--purple); border:1px solid rgba(168,85,247,0.3); }
+.bp-arrow  { color:var(--muted); font-size:12px; }
+
+/* Decoder */
+.selects-grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:1.25rem; }
+.selects-grid-5 { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:1.25rem; }
+.selects-grid-6 { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:1.25rem; }
+.sel-group label { display:block; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:5px; }
+.sel-group label.lc4 { color:var(--accent); }
+.sel-group label.lc5 { color:var(--blue); }
+.sel-group label.lc6 { color:var(--purple); }
+select { width:100%; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:7px 6px; font-size:12px; font-family:'DM Sans',sans-serif; cursor:pointer; outline:none; }
+select:focus { border-color:var(--accent); }
+
+/* Quiz */
+.progress-bar-wrap { background:var(--surface2); border-radius:99px; height:4px; margin-bottom:1rem; }
+.progress-bar { background:var(--accent); height:4px; border-radius:99px; transition:width 0.3s; }
+.progress-txt { font-size:12px; color:var(--muted); margin-bottom:0.5rem; font-family:'Space Mono',monospace; }
+.opts-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:1rem; }
+.opt { padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:transparent; color:var(--text); font-family:'Space Mono',monospace; font-size:12px; cursor:pointer; transition:all 0.15s; text-align:center; }
+.opt:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+.opt.correct { border-color:var(--green); background:rgba(76,175,125,0.1); color:var(--green); }
+.opt.wrong   { border-color:var(--red); background:rgba(224,92,58,0.1); color:var(--red); }
+.opt:disabled { cursor:default; }
+.feedback-box { margin-top:0.75rem; padding:0.7rem 1rem; border-radius:8px; font-size:13px; display:none; }
+.feedback-box.ok   { display:block; background:rgba(76,175,125,0.1); border:1px solid var(--green); color:var(--green); }
+.feedback-box.fail { display:block; background:rgba(224,92,58,0.1); border:1px solid var(--red); color:var(--red); }
+.next-btn { margin-top:0.75rem; padding:9px 22px; border-radius:8px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600; cursor:pointer; display:none; transition:all 0.15s; }
+.next-btn:hover { background:var(--accent); color:#000; }
+.next-btn.show { display:inline-block; }
+.score-card { text-align:center; padding:2rem; display:none; }
+.score-card.show { display:block; }
+.score-num { font-family:'Space Mono',monospace; font-size:3rem; color:var(--accent); }
+.score-label { color:var(--muted); margin-top:0.5rem; }
+.restart-btn { margin-top:1.25rem; padding:10px 28px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:#000; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:700; cursor:pointer; }
+
+/* Badge */
+.badge { display:inline-block; font-size:11px; font-family:'Space Mono',monospace; padding:2px 8px; border-radius:99px; margin-left:6px; vertical-align:middle; }
+.badge.b4 { background:rgba(245,200,66,0.15); color:var(--accent); border:1px solid rgba(245,200,66,0.3); }
+.badge.b5 { background:rgba(68,136,255,0.15); color:var(--blue); border:1px solid rgba(68,136,255,0.3); }
+.badge.b6 { background:rgba(168,85,247,0.15); color:var(--purple); border:1px solid rgba(168,85,247,0.3); }
+
+/* Tempco table */
+.tc-table { width:100%; border-collapse:collapse; font-size:13px; margin-top:0.75rem; }
+.tc-table th { text-align:left; padding:6px 8px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:0.5px; }
+.tc-table td { padding:6px 8px; border-top:1px solid var(--border); }
+
+/* Print button */
+.print-btn {
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 24px; border-radius:8px;
+  border:1px solid var(--accent); background:var(--accent);
+  color:#000; font-family:'DM Sans',sans-serif;
+  font-size:14px; font-weight:700; cursor:pointer;
+  margin-bottom:1.5rem; transition:all 0.15s;
+}
+.print-btn:hover { background:#e6b800; }
+
+/* ═══════════════════════════════════════════════
+   TISKOVÝ TAHÁK — zobrazí se pouze při tisku
+   ═══════════════════════════════════════════════ */
+#print-sheet { display:none; }
+
+@media print {
+  /* Skryj vše kromě tiskového taháku */
+  body { background:#fff !important; color:#000 !important; font-family:Arial,sans-serif; font-size:11pt; }
+  header, .tabs, .tab-content, .print-btn { display:none !important; }
+  #print-sheet { display:block !important; }
+
+  /* Stránka A4 */
+  @page { size:A4; margin:12mm 14mm; }
+
+  /* Reset barev pro tisk */
+  .pt-title { font-size:16pt; font-weight:700; margin-bottom:2mm; }
+  .pt-sub   { font-size:9pt; color:#555; margin-bottom:5mm; }
+
+  .pt-section { margin-bottom:5mm; }
+  .pt-section-title {
+    font-size:10pt; font-weight:700; text-transform:uppercase;
+    letter-spacing:0.5px; border-bottom:1.5pt solid #000;
+    padding-bottom:1mm; margin-bottom:3mm;
+  }
+
+  /* Hlavní tabulka barev */
+  .pt-main-table { width:100%; border-collapse:collapse; font-size:9.5pt; }
+  .pt-main-table th {
+    background:#222 !important; color:#fff !important;
+    padding:3pt 5pt; text-align:center; font-size:8.5pt;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  .pt-main-table th:first-child { text-align:left; }
+  .pt-main-table td { padding:3pt 5pt; border-bottom:0.5pt solid #ddd; text-align:center; }
+  .pt-main-table td:first-child { text-align:left; }
+  .pt-main-table tr:nth-child(even) td { background:#f7f7f7 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+
+  .pt-color-swatch {
+    display:inline-block; width:20pt; height:10pt;
+    border-radius:2pt; border:0.5pt solid #999;
+    vertical-align:middle; margin-right:4pt;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+
+  /* Struktura proužků */
+  .pt-band-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:4mm; margin-bottom:4mm; }
+  .pt-band-box { border:1pt solid #ccc; border-radius:3pt; padding:3mm; }
+  .pt-band-box-title { font-size:9pt; font-weight:700; margin-bottom:2mm; }
+  .pt-band-row { display:flex; gap:3pt; align-items:center; flex-wrap:wrap; margin-bottom:1.5mm; }
+  .pt-pill {
+    font-size:7.5pt; padding:1.5pt 5pt; border-radius:99pt;
+    border:0.5pt solid #999; font-family:monospace;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  .pt-pill-digit { background:#fff8d6 !important; border-color:#c8a800 !important; }
+  .pt-pill-mult  { background:#ddeeff !important; border-color:#2266cc !important; }
+  .pt-pill-tol   { background:#ddf5e8 !important; border-color:#2a8a50 !important; }
+  .pt-pill-tc    { background:#f0e0ff !important; border-color:#8833cc !important; }
+  .pt-arrow      { font-size:8pt; color:#666; }
+
+  /* Teplotní koeficient tabulka */
+  .pt-tc-table { width:100%; border-collapse:collapse; font-size:9pt; }
+  .pt-tc-table th { background:#f0e0ff !important; padding:2.5pt 5pt; font-size:8.5pt; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .pt-tc-table td { padding:2.5pt 5pt; border-bottom:0.5pt solid #ddd; }
+
+  /* Pravidla */
+  .pt-rules { font-size:9pt; line-height:1.7; }
+  .pt-rules li { margin-bottom:1mm; }
+  .pt-warn { background:#fff0ee !important; border-left:3pt solid #cc3300; padding:2mm 4mm; font-size:9pt; margin-top:3mm; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+
+  /* Zápatí */
+  .pt-footer { margin-top:5mm; font-size:8pt; color:#888; text-align:center; border-top:0.5pt solid #ccc; padding-top:2mm; }
+
+  /* Zabraň dělení tabulky přes stránky */
+  .pt-section { page-break-inside:avoid; }
+}
+
+@media (max-width:640px) {
+  .selects-grid-4,.selects-grid-5,.selects-grid-6 { grid-template-columns:1fr 1fr; }
+  .opts-grid { grid-template-columns:1fr; }
+  .compare-grid { grid-template-columns:1fr; }
+  header { padding:1.25rem 1rem 0; }
+  .tab-content { padding:1.25rem 1rem; }
+  .tab-btn { font-size:11.5px; padding:0.5rem 0.75rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TISKOVÝ TAHÁK — skrytý na obrazovce, viditelný při tisku
+     ═══════════════════════════════════════════════════════════ -->
+<div id="print-sheet">
+  <div class="pt-title">Barevné značení rezistorů — tahák</div>
+  <div class="pt-sub">Výukový materiál · 4-proužkové, 5-proužkové a 6-proužkové značení</div>
+
+  <!-- STRUKTURA PROUŽKŮ -->
+  <div class="pt-section">
+    <div class="pt-section-title">Struktura proužků</div>
+    <div class="pt-band-grid">
+      <div class="pt-band-box">
+        <div class="pt-band-box-title">4-proužkový (běžný, ±5–10 %)</div>
+        <div class="pt-band-row">
+          <span class="pt-pill pt-pill-digit">1. číslice</span>
+          <span class="pt-arrow">→</span>
+          <span class="pt-pill pt-pill-digit">2. číslice</span>
+          <span class="pt-arrow">→</span>
+          <span class="pt-pill pt-pill-mult">násobitel</span>
+          <span class="pt-arrow">→</span>
+          <span class="pt-pill pt-pill-tol">tolerance</span>
+        </div>
+        <div style="font-size:8pt;color:#555;margin-top:2mm;">Použití: školní obvody, hobby, spotřební elektronika</div>
+      </div>
+      <div class="pt-band-box">
+        <div class="pt-band-box-title">5-proužkový (přesný, ±1–2 %)</div>
+        <div class="pt-band-row">
+          <span class="pt-pill pt-pill-digit">1. čísl.</span>
+          <span class="pt-arrow">→</span>
+          <span class="pt-pill pt-pill-digit">2. čísl.</span>
+          <span class="pt-arrow">→</span>
+          <span class="pt-pill pt-pill-digit">3. čísl.</span>
+          <span class="pt-arrow">→</span>
+          <span class="pt-pill pt-pill-mult">násob.</span>
+          <span class="pt-arrow">→</span>
+          <span class="pt-pill pt-pill-tol">tol.</span>
+        </div>
+        <div style="font-size:8pt;color:#555;margin-top:2mm;">Použití: měřicí přístroje, audio, lékařská elektronika</div>
+      </div>
+      <div class="pt-band-box">
+        <div class="pt-band-box-title">6-proužkový (precizní, ±1 %)</div>
+        <div class="pt-band-row">
+          <span class="pt-pill pt-pill-digit">1.</span>
+          <span class="pt-arrow">→</span>
+          <span class="pt-pill pt-pill-digit">2.</span>
+          <span class="pt-arrow">→</span>
+          <span class="pt-pill pt-pill-digit">3.</span>
+          <span class="pt-arrow">→</span>
+          <span class="pt-pill pt-pill-mult">nás.</span>
+          <span class="pt-arrow">→</span>
+          <span class="pt-pill pt-pill-tol">tol.</span>
+          <span class="pt-arrow">→</span>
+          <span class="pt-pill pt-pill-tc">tepl.koef.</span>
+        </div>
+        <div style="font-size:8pt;color:#555;margin-top:2mm;">Použití: vojenská, letecká, vědecká elektronika</div>
+      </div>
+    </div>
+    <div class="pt-warn">
+      ⚠ POZOR: 3. proužek u 5-proužkového je vždy 3. ČÍSLICE — nikdy násobitel ani teplotní koeficient.
+      Teplotní koeficient existuje výhradně jako 6. proužek u 6-proužkových rezistorů.
+    </div>
+  </div>
+
+  <!-- HLAVNÍ TABULKA BAREV -->
+  <div class="pt-section" style="margin-top:5mm;">
+    <div class="pt-section-title">Tabulka barev</div>
+    <table class="pt-main-table">
+      <thead>
+        <tr>
+          <th style="text-align:left;">Barva</th>
+          <th>Číslice</th>
+          <th>Násobitel</th>
+          <th>Tolerance</th>
+          <th>Tepl. koeficient (6. proužek)</th>
+        </tr>
+      </thead>
+      <tbody id="pt-color-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- PŘÍKLADY -->
+  <div class="pt-section" style="margin-top:5mm;">
+    <div class="pt-section-title">Příklady čtení</div>
+    <table style="width:100%;border-collapse:collapse;font-size:9.5pt;">
+      <thead>
+        <tr style="background:#f0f0f0;">
+          <th style="padding:3pt 5pt;text-align:left;border-bottom:1pt solid #ccc;">Typ</th>
+          <th style="padding:3pt 5pt;text-align:left;border-bottom:1pt solid #ccc;">Proužky (zleva)</th>
+          <th style="padding:3pt 5pt;text-align:left;border-bottom:1pt solid #ccc;">Výpočet</th>
+          <th style="padding:3pt 5pt;text-align:left;border-bottom:1pt solid #ccc;">Výsledek</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;">4-proužkový</td>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;">Hnědá · Černá · Oranžová · Zlatá</td>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;">10 × 1 000</td>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;font-weight:700;">10 kΩ ±5 %</td>
+        </tr>
+        <tr style="background:#f7f7f7;">
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;">4-proužkový</td>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;">Červená · Červená · Červená · Hnědá</td>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;">22 × 100</td>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;font-weight:700;">2,2 kΩ ±1 %</td>
+        </tr>
+        <tr>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;">5-proužkový</td>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;">Žlutá · Fialová · Zelená · Červená · Hnědá</td>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;">475 × 100</td>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;font-weight:700;">47,5 kΩ ±1 %</td>
+        </tr>
+        <tr style="background:#f7f7f7;">
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;">5-proužkový</td>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;">Hnědá · Černá · Černá · Černá · Hnědá</td>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;">100 × 1</td>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;font-weight:700;">100 Ω ±1 %</td>
+        </tr>
+        <tr>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;">6-proužkový</td>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;">Hnědá · Zelená · Šedá · Červená · Hnědá · Červená</td>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;">158 × 100</td>
+          <td style="padding:3pt 5pt;border-bottom:0.5pt solid #ddd;font-weight:700;">15,8 kΩ ±1 % · 50 ppm/°C</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pt-footer">
+    Barevné značení rezistorů · Výukový tahák · Otevři HTML soubor pro interaktivní dekodér a cvičení
+  </div>
+</div>
+
+<header>
+  <h1>Barevné značení rezistorů</h1>
+  <p>Interaktivní výukový materiál · 4, 5 a 6-proužkové značení</p>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('story',this)">📖 Teorie &amp; příklad</button>
+    <button class="tab-btn" onclick="showTab('dec4',this)">🔍 Dekodér 4-proužkový</button>
+    <button class="tab-btn" onclick="showTab('dec5',this)">🔍 Dekodér 5-proužkový</button>
+    <button class="tab-btn" onclick="showTab('dec6',this)">🔍 Dekodér 6-proužkový</button>
+    <button class="tab-btn" onclick="showTab('quiz4',this)">✏️ Cvičení 4-proužkové</button>
+    <button class="tab-btn" onclick="showTab('quiz5',this)">✏️ Cvičení 5-proužkové</button>
+    <button class="tab-btn" onclick="showTab('quiz6',this)">⭐ Cvičení 6-proužkové</button>
+    <button class="tab-btn" onclick="showTab('tahak',this)">🖨️ Tiskový tahák</button>
+  </div>
+</header>
+
+<!-- ═══════════════ TAB 1: TEORIE ═══════════════ -->
+<div id="tab-story" class="tab-content active">
+
+  <div class="card">
+    <h2>Co je rezistor a proč jsou proužky?</h2>
+    <p style="font-size:14px;color:var(--muted);line-height:1.8;">
+      Rezistor je součástka, která <strong style="color:var(--text);">omezuje průtok elektrického proudu</strong>.
+      Používá se všude — v nabíječkách, světlech, audio technice, průmyslových strojích i lékařských přístrojích.
+      Protože je tělíčko příliš malé na číslo, hodnota se zakóduje do <strong style="color:var(--text);">barevných proužků</strong>.
+      Každá barva = číslice nebo instrukce. Pořadí proužků je pevně dané.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>⚠ Klíčové pravidlo — pořadí proužků</h2>
+    <div class="warn-box">
+      <strong>DŮLEŽITÉ:</strong> Každý typ rezistoru má pevně dané pořadí proužků.
+      Třetí proužek u 5-proužkového je <strong>vždy třetí číslice hodnoty</strong> —
+      nikdy teplotní koeficient, nikdy násobitel.
+      Teplotní koeficient existuje <strong>výhradně jako 6. proužek</strong> u 6-proužkových rezistorů.
+    </div>
+    <div style="display:flex;flex-direction:column;gap:0.9rem;margin-top:1rem;">
+      <div>
+        <p style="font-size:12px;color:var(--accent);font-family:'Space Mono',monospace;margin-bottom:0.3rem;">4-PROUŽKOVÝ <span class="badge b4">běžný</span></p>
+        <div class="band-struct">
+          <span class="band-pill bp-digit">1. číslice</span><span class="bp-arrow">→</span>
+          <span class="band-pill bp-digit">2. číslice</span><span class="bp-arrow">→</span>
+          <span class="band-pill bp-mult">násobitel</span><span class="bp-arrow">→</span>
+          <span class="band-pill bp-tol">tolerance</span>
+        </div>
+      </div>
+      <div>
+        <p style="font-size:12px;color:var(--blue);font-family:'Space Mono',monospace;margin-bottom:0.3rem;">5-PROUŽKOVÝ <span class="badge b5">přesný</span></p>
+        <div class="band-struct">
+          <span class="band-pill bp-digit">1. číslice</span><span class="bp-arrow">→</span>
+          <span class="band-pill bp-digit">2. číslice</span><span class="bp-arrow">→</span>
+          <span class="band-pill bp-digit">3. číslice</span><span class="bp-arrow">→</span>
+          <span class="band-pill bp-mult">násobitel</span><span class="bp-arrow">→</span>
+          <span class="band-pill bp-tol">tolerance</span>
+        </div>
+      </div>
+      <div>
+        <p style="font-size:12px;color:var(--purple);font-family:'Space Mono',monospace;margin-bottom:0.3rem;">6-PROUŽKOVÝ <span class="badge b6">precizní</span></p>
+        <div class="band-struct">
+          <span class="band-pill bp-digit">1. číslice</span><span class="bp-arrow">→</span>
+          <span class="band-pill bp-digit">2. číslice</span><span class="bp-arrow">→</span>
+          <span class="band-pill bp-digit">3. číslice</span><span class="bp-arrow">→</span>
+          <span class="band-pill bp-mult">násobitel</span><span class="bp-arrow">→</span>
+          <span class="band-pill bp-tol">tolerance</span><span class="bp-arrow">→</span>
+          <span class="band-pill bp-tc">teplotní koef.</span>
+        </div>
+      </div>
+    </div>
+    <div class="info-box green" style="margin-top:1.25rem;">
+      <strong>Shrnutí:</strong> 5-proužkový přidává jednu číslici navíc oproti 4-proužkovému.
+      6-proužkový je totožný s 5-proužkovým + teplotní koeficient jako poslední proužek.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Kdy se který typ používá v praxi?</h2>
+    <div class="compare-grid">
+      <div class="compare-card">
+        <h3 class="c4">4-proužkový <span class="badge b4">běžný</span></h3>
+        <ul>
+          <li>Tolerance <strong>±5 % nebo ±10 %</strong></li>
+          <li>Školní obvody, hobby</li>
+          <li>Spotřební elektronika</li>
+          <li>Jednoduché napájecí obvody</li>
+        </ul>
+      </div>
+      <div class="compare-card">
+        <h3 class="c5">5-proužkový <span class="badge b5">přesný</span></h3>
+        <ul>
+          <li>Tolerance <strong>±1 % nebo ±2 %</strong></li>
+          <li>Měřicí přístroje</li>
+          <li>Audio zesilovače</li>
+          <li>Lékařská elektronika</li>
+        </ul>
+      </div>
+      <div class="compare-card">
+        <h3 class="c6">6-proužkový <span class="badge b6">precizní</span></h3>
+        <ul>
+          <li>Tolerance <strong>±1 %</strong> + teplotní stabilita</li>
+          <li>Vojenská a letecká elektronika</li>
+          <li>Vědecké přístroje</li>
+          <li>Obvody v extrémních teplotách</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Co je teplotní koeficient? (6. proužek)</h2>
+    <p style="font-size:14px;color:var(--muted);margin-bottom:1rem;line-height:1.8;">
+      Každý rezistor mírně mění svůj odpor se změnou teploty. U běžných obvodů to nevadí.
+      Ale v přesných zařízeních i malá změna odporu způsobí chybné měření.
+      6. proužek říká, <strong style="color:var(--text);">o kolik ppm se změní odpor při zahřátí o 1 °C</strong>.
+    </p>
+    <div class="info-box purple">
+      <strong>Příklad:</strong> Rezistor 10 000 Ω s koeficientem 100 ppm/°C se při zahřátí o 10 °C změní na ~10 010 Ω.
+      V přesném měřicím přístroji to může způsobit chybu měření.
+    </div>
+    <table class="tc-table">
+      <thead><tr><th>Barva 6. proužku</th><th>Teplotní koeficient</th><th>Typické použití</th></tr></thead>
+      <tbody>
+        <tr><td style="display:flex;align-items:center;gap:8px;"><span style="width:24px;height:12px;border-radius:2px;background:#8B4513;display:inline-block;border:1px solid rgba(255,255,255,0.1);"></span>Hnědá</td><td style="color:var(--muted);">100 ppm/°C</td><td style="color:var(--muted);">Průmyslová elektronika</td></tr>
+        <tr><td style="display:flex;align-items:center;gap:8px;"><span style="width:24px;height:12px;border-radius:2px;background:#EE0000;display:inline-block;border:1px solid rgba(255,255,255,0.1);"></span>Červená</td><td style="color:var(--muted);">50 ppm/°C</td><td style="color:var(--muted);">Měřicí přístroje</td></tr>
+        <tr><td style="display:flex;align-items:center;gap:8px;"><span style="width:24px;height:12px;border-radius:2px;background:#FF8C00;display:inline-block;border:1px solid rgba(255,255,255,0.1);"></span>Oranžová</td><td style="color:var(--muted);">15 ppm/°C</td><td style="color:var(--muted);">Přesná měření</td></tr>
+        <tr><td style="display:flex;align-items:center;gap:8px;"><span style="width:24px;height:12px;border-radius:2px;background:#E8E000;display:inline-block;border:1px solid rgba(255,255,255,0.1);"></span>Žlutá</td><td style="color:var(--muted);">25 ppm/°C</td><td style="color:var(--muted);">Průmyslová řídicí technika</td></tr>
+        <tr><td style="display:flex;align-items:center;gap:8px;"><span style="width:24px;height:12px;border-radius:2px;background:#1155EE;display:inline-block;border:1px solid rgba(255,255,255,0.1);"></span>Modrá</td><td style="color:var(--muted);">10 ppm/°C</td><td style="color:var(--muted);">Vědecké přístroje, letectví</td></tr>
+        <tr><td style="display:flex;align-items:center;gap:8px;"><span style="width:24px;height:12px;border-radius:2px;background:#800080;display:inline-block;border:1px solid rgba(255,255,255,0.1);"></span>Fialová</td><td style="color:var(--muted);">5 ppm/°C</td><td style="color:var(--muted);">Nejpřesnější referenční obvody</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Zadání pro prvňáka: dělič napětí (4-proužkový)</h2>
+    <div class="story-banner">
+      <strong style="color:var(--accent);">Situace:</strong> Stavíš dělič napětí — z 9V baterie chceš získat 4,5V.
+      Potřebuješ <strong>dva rezistory 10 kΩ</strong>. Na stole leží hromada různých rezistorů. Jak je identifikuješ?
+    </div>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><p>Začínáš od strany, kde jsou proužky <strong>blíž u okraje</strong> tělíčka.</p></div>
+      <div class="step"><div class="step-num">2</div><p><strong>1. a 2. proužek</strong> = číslice. Hnědá = 1, černá = 0 → číslo <strong>10</strong>.</p></div>
+      <div class="step"><div class="step-num">3</div><p><strong>3. proužek</strong> = násobitel. Oranžová = ×1 000 → 10 × 1 000 = <strong>10 kΩ</strong>.</p></div>
+      <div class="step"><div class="step-num">4</div><p><strong>4. proužek</strong> = tolerance. Zlatá = ±5 %.</p></div>
+      <div class="step"><div class="step-num">5</div><p>Zapojíš dva takové rezistory do série → napětí se rozdělí napůl → <strong>4,5V</strong>.</p></div>
+    </div>
+    <p class="note">Kdybys použil 10 kΩ a 1 kΩ, dostaneš místo 4,5V jen asi 0,8V. Špatná hodnota = špatný výsledek.</p>
+  </div>
+
+  <div class="card">
+    <h2>Ukázka: 10 kΩ (4-proužkový)</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:0.5rem;">Hnědá · Černá · Oranžová · Zlatá</p>
+    <div class="res-wrap">
+      <div class="wire"></div>
+      <div class="res-body">
+        <div class="stripe" style="background:#8B4513;"></div>
+        <div class="stripe" style="background:#111111;"></div>
+        <div class="gap-sm"></div>
+        <div class="stripe" style="background:#FF8C00;"></div>
+        <div class="gap-xs"></div>
+        <div class="stripe" style="background:#DAA520;"></div>
+      </div>
+      <div class="wire"></div>
+    </div>
+    <div class="stripe-row">
+      <div class="stripe-col"><div class="mini" style="background:#8B4513;"></div><div class="lbl">hnědá<br>1. číslice<br><strong style="color:var(--text);">1</strong></div></div>
+      <div class="stripe-col"><div class="mini" style="background:#111111;"></div><div class="lbl">černá<br>2. číslice<br><strong style="color:var(--text);">0</strong></div></div>
+      <div class="stripe-col" style="margin-left:8px;"><div class="mini" style="background:#FF8C00;"></div><div class="lbl">oranžová<br>násobitel<br><strong style="color:var(--text);">×1000</strong></div></div>
+      <div class="stripe-col" style="margin-left:4px;"><div class="mini" style="background:#DAA520;"></div><div class="lbl">zlatá<br>tolerance<br><strong style="color:var(--text);">±5 %</strong></div></div>
+    </div>
+    <div class="result-pill"><span class="val">10 kΩ</span><span class="tol">tolerance ±5 %</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Ukázka: 47,5 kΩ (5-proužkový)</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:0.5rem;">Žlutá · Fialová · Zelená · Červená · Hnědá</p>
+    <div class="res-wrap">
+      <div class="wire"></div>
+      <div class="res-body">
+        <div class="stripe" style="background:#E8E000;"></div>
+        <div class="stripe" style="background:#800080;"></div>
+        <div class="stripe" style="background:#006400;"></div>
+        <div class="gap-sm"></div>
+        <div class="stripe" style="background:#EE0000;"></div>
+        <div class="gap-xs"></div>
+        <div class="stripe" style="background:#8B4513;"></div>
+      </div>
+      <div class="wire"></div>
+    </div>
+    <div class="stripe-row">
+      <div class="stripe-col"><div class="mini" style="background:#E8E000;"></div><div class="lbl">žlutá<br>1. číslice<br><strong style="color:var(--text);">4</strong></div></div>
+      <div class="stripe-col"><div class="mini" style="background:#800080;"></div><div class="lbl">fialová<br>2. číslice<br><strong style="color:var(--text);">7</strong></div></div>
+      <div class="stripe-col"><div class="mini" style="background:#006400;"></div><div class="lbl">zelená<br>3. číslice<br><strong style="color:var(--text);">5</strong></div></div>
+      <div class="stripe-col" style="margin-left:8px;"><div class="mini" style="background:#EE0000;"></div><div class="lbl">červená<br>násobitel<br><strong style="color:var(--text);">×100</strong></div></div>
+      <div class="stripe-col" style="margin-left:4px;"><div class="mini" style="background:#8B4513;"></div><div class="lbl">hnědá<br>tolerance<br><strong style="color:var(--text);">±1 %</strong></div></div>
+    </div>
+    <div class="result-pill"><span class="val">47,5 kΩ</span><span class="tol">tolerance ±1 %</span></div>
+    <p class="note">475 × 100 = 47 500 Ω = 47,5 kΩ. Tuto hodnotu by 4-proužkový nedokázal vyjádřit.</p>
+  </div>
+
+  <div class="card">
+    <h2>Ukázka: 15,8 kΩ (6-proužkový)</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:0.5rem;">Hnědá · Zelená · Šedá · Červená · Hnědá · Červená</p>
+    <div class="res-wrap">
+      <div class="wire"></div>
+      <div class="res-body">
+        <div class="stripe" style="background:#8B4513;"></div>
+        <div class="stripe" style="background:#006400;"></div>
+        <div class="stripe" style="background:#888888;"></div>
+        <div class="gap-sm"></div>
+        <div class="stripe" style="background:#EE0000;"></div>
+        <div class="gap-xs"></div>
+        <div class="stripe" style="background:#8B4513;"></div>
+        <div class="gap-xs"></div>
+        <div class="stripe" style="background:#EE0000;"></div>
+      </div>
+      <div class="wire"></div>
+    </div>
+    <div class="stripe-row">
+      <div class="stripe-col"><div class="mini" style="background:#8B4513;"></div><div class="lbl">hnědá<br>1. číslice<br><strong style="color:var(--text);">1</strong></div></div>
+      <div class="stripe-col"><div class="mini" style="background:#006400;"></div><div class="lbl">zelená<br>2. číslice<br><strong style="color:var(--text);">5</strong></div></div>
+      <div class="stripe-col"><div class="mini" style="background:#888888;"></div><div class="lbl">šedá<br>3. číslice<br><strong style="color:var(--text);">8</strong></div></div>
+      <div class="stripe-col" style="margin-left:8px;"><div class="mini" style="background:#EE0000;"></div><div class="lbl">červená<br>násobitel<br><strong style="color:var(--text);">×100</strong></div></div>
+      <div class="stripe-col" style="margin-left:4px;"><div class="mini" style="background:#8B4513;"></div><div class="lbl">hnědá<br>tolerance<br><strong style="color:var(--text);">±1 %</strong></div></div>
+      <div class="stripe-col" style="margin-left:4px;"><div class="mini" style="background:#EE0000;"></div><div class="lbl">červená<br>tepl. koef.<br><strong style="color:var(--purple);">50 ppm/°C</strong></div></div>
+    </div>
+    <div class="result-pill"><span class="val">15,8 kΩ</span><span class="tol">tolerance ±1 %</span><span class="tempco">50 ppm/°C</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Přehled barev a hodnot</h2>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">
+          <th style="text-align:left;padding:6px 8px;">Barva</th>
+          <th style="text-align:center;padding:6px 8px;">Číslice</th>
+          <th style="text-align:center;padding:6px 8px;">Násobitel</th>
+          <th style="text-align:center;padding:6px 8px;">Tolerance</th>
+          <th style="text-align:center;padding:6px 8px;">Tepl. koef.</th>
+        </tr>
+      </thead>
+      <tbody id="color-table"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════ TAB 2: DEKODÉR 4 ═══════════════ -->
+<div id="tab-dec4" class="tab-content">
+  <div class="info-box yellow" style="margin-bottom:1.25rem;">
+    <strong>4-proužkové:</strong> 2 číslice → násobitel → tolerance. Tolerance ±5 % nebo ±10 %.
+    Typické použití: školní obvody, spotřební elektronika, hobby projekty.
+  </div>
+  <div class="card">
+    <h2>Dekodér — 4 proužky</h2>
+    <div class="selects-grid-4">
+      <div class="sel-group"><label class="lc4">1. číslice</label>
+        <select id="d4_1" onchange="decode4()">
+          <option value="0" data-hex="#111111">Černá – 0</option>
+          <option value="1" data-hex="#8B4513" selected>Hnědá – 1</option>
+          <option value="2" data-hex="#EE0000">Červená – 2</option>
+          <option value="3" data-hex="#FF8C00">Oranžová – 3</option>
+          <option value="4" data-hex="#E8E000">Žlutá – 4</option>
+          <option value="5" data-hex="#006400">Zelená – 5</option>
+          <option value="6" data-hex="#1155EE">Modrá – 6</option>
+          <option value="7" data-hex="#800080">Fialová – 7</option>
+          <option value="8" data-hex="#888888">Šedá – 8</option>
+          <option value="9" data-hex="#dddddd">Bílá – 9</option>
+        </select>
+      </div>
+      <div class="sel-group"><label class="lc4">2. číslice</label>
+        <select id="d4_2" onchange="decode4()">
+          <option value="0" data-hex="#111111" selected>Černá – 0</option>
+          <option value="1" data-hex="#8B4513">Hnědá – 1</option>
+          <option value="2" data-hex="#EE0000">Červená – 2</option>
+          <option value="3" data-hex="#FF8C00">Oranžová – 3</option>
+          <option value="4" data-hex="#E8E000">Žlutá – 4</option>
+          <option value="5" data-hex="#006400">Zelená – 5</option>
+          <option value="6" data-hex="#1155EE">Modrá – 6</option>
+          <option value="7" data-hex="#800080">Fialová – 7</option>
+          <option value="8" data-hex="#888888">Šedá – 8</option>
+          <option value="9" data-hex="#dddddd">Bílá – 9</option>
+        </select>
+      </div>
+      <div class="sel-group"><label class="lc4">Násobitel</label>
+        <select id="d4_3" onchange="decode4()">
+          <option value="0.01" data-hex="#C0C0C0">Stříbrná – ×0,01</option>
+          <option value="0.1" data-hex="#DAA520">Zlatá – ×0,1</option>
+          <option value="1" data-hex="#111111">Černá – ×1</option>
+          <option value="10" data-hex="#8B4513">Hnědá – ×10</option>
+          <option value="100" data-hex="#EE0000">Červená – ×100</option>
+          <option value="1000" data-hex="#FF8C00" selected>Oranžová – ×1 000</option>
+          <option value="10000" data-hex="#E8E000">Žlutá – ×10 000</option>
+          <option value="100000" data-hex="#006400">Zelená – ×100 000</option>
+          <option value="1000000" data-hex="#1155EE">Modrá – ×1 000 000</option>
+        </select>
+      </div>
+      <div class="sel-group"><label class="lc4">Tolerance</label>
+        <select id="d4_4" onchange="decode4()">
+          <option value="±20 %" data-hex="#dddddd">Bílá – ±20 %</option>
+          <option value="±10 %" data-hex="#C0C0C0">Stříbrná – ±10 %</option>
+          <option value="±5 %" data-hex="#DAA520" selected>Zlatá – ±5 %</option>
+          <option value="±2 %" data-hex="#EE0000">Červená – ±2 %</option>
+          <option value="±1 %" data-hex="#8B4513">Hnědá – ±1 %</option>
+          <option value="±0,5 %" data-hex="#006400">Zelená – ±0,5 %</option>
+          <option value="±0,25 %" data-hex="#1155EE">Modrá – ±0,25 %</option>
+          <option value="±0,1 %" data-hex="#800080">Fialová – ±0,1 %</option>
+        </select>
+      </div>
+    </div>
+    <div class="res-wrap">
+      <div class="wire"></div>
+      <div class="res-body">
+        <div class="stripe" id="d4v1" style="background:#8B4513;"></div>
+        <div class="stripe" id="d4v2" style="background:#111111;"></div>
+        <div class="gap-sm"></div>
+        <div class="stripe" id="d4v3" style="background:#FF8C00;"></div>
+        <div class="gap-xs"></div>
+        <div class="stripe" id="d4v4" style="background:#DAA520;"></div>
+      </div>
+      <div class="wire"></div>
+    </div>
+    <div class="result-pill">
+      <span class="val" id="d4-val">10 kΩ</span>
+      <span class="tol" id="d4-tol">tolerance ±5 %</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ TAB 3: DEKODÉR 5 ═══════════════ -->
+<div id="tab-dec5" class="tab-content">
+  <div class="info-box blue" style="margin-bottom:1.25rem;">
+    <strong>5-proužkové:</strong> 3 číslice → násobitel → tolerance. Tolerance ±1 % nebo ±2 %.
+  </div>
+  <div class="warn-box">
+    <strong>Připomínka:</strong> 3. proužek je <strong>třetí číslice hodnoty</strong> — ne násobitel, ne teplotní koeficient.
+    Teplotní koeficient existuje pouze u 6-proužkových rezistorů jako 6. proužek.
+  </div>
+  <div class="card">
+    <h2>Dekodér — 5 proužků</h2>
+    <div class="selects-grid-5">
+      <div class="sel-group"><label class="lc5">1. číslice</label>
+        <select id="d5_1" onchange="decode5()">
+          <option value="0" data-hex="#111111">Černá – 0</option>
+          <option value="1" data-hex="#8B4513">Hnědá – 1</option>
+          <option value="2" data-hex="#EE0000">Červená – 2</option>
+          <option value="3" data-hex="#FF8C00">Oranžová – 3</option>
+          <option value="4" data-hex="#E8E000" selected>Žlutá – 4</option>
+          <option value="5" data-hex="#006400">Zelená – 5</option>
+          <option value="6" data-hex="#1155EE">Modrá – 6</option>
+          <option value="7" data-hex="#800080">Fialová – 7</option>
+          <option value="8" data-hex="#888888">Šedá – 8</option>
+          <option value="9" data-hex="#dddddd">Bílá – 9</option>
+        </select>
+      </div>
+      <div class="sel-group"><label class="lc5">2. číslice</label>
+        <select id="d5_2" onchange="decode5()">
+          <option value="0" data-hex="#111111">Černá – 0</option>
+          <option value="1" data-hex="#8B4513">Hnědá – 1</option>
+          <option value="2" data-hex="#EE0000">Červená – 2</option>
+          <option value="3" data-hex="#FF8C00">Oranžová – 3</option>
+          <option value="4" data-hex="#E8E000">Žlutá – 4</option>
+          <option value="5" data-hex="#006400">Zelená – 5</option>
+          <option value="6" data-hex="#1155EE">Modrá – 6</option>
+          <option value="7" data-hex="#800080" selected>Fialová – 7</option>
+          <option value="8" data-hex="#888888">Šedá – 8</option>
+          <option value="9" data-hex="#dddddd">Bílá – 9</option>
+        </select>
+      </div>
+      <div class="sel-group"><label class="lc5">3. číslice</label>
+        <select id="d5_3" onchange="decode5()">
+          <option value="0" data-hex="#111111">Černá – 0</option>
+          <option value="1" data-hex="#8B4513">Hnědá – 1</option>
+          <option value="2" data-hex="#EE0000">Červená – 2</option>
+          <option value="3" data-hex="#FF8C00">Oranžová – 3</option>
+          <option value="4" data-hex="#E8E000">Žlutá – 4</option>
+          <option value="5" data-hex="#006400" selected>Zelená – 5</option>
+          <option value="6" data-hex="#1155EE">Modrá – 6</option>
+          <option value="7" data-hex="#800080">Fialová – 7</option>
+          <option value="8" data-hex="#888888">Šedá – 8</option>
+          <option value="9" data-hex="#dddddd">Bílá – 9</option>
+        </select>
+      </div>
+      <div class="sel-group"><label class="lc5">Násobitel</label>
+        <select id="d5_4" onchange="decode5()">
+          <option value="0.01" data-hex="#C0C0C0">Stříbrná – ×0,01</option>
+          <option value="0.1" data-hex="#DAA520">Zlatá – ×0,1</option>
+          <option value="1" data-hex="#111111">Černá – ×1</option>
+          <option value="10" data-hex="#8B4513">Hnědá – ×10</option>
+          <option value="100" data-hex="#EE0000" selected>Červená – ×100</option>
+          <option value="1000" data-hex="#FF8C00">Oranžová – ×1 000</option>
+          <option value="10000" data-hex="#E8E000">Žlutá – ×10 000</option>
+          <option value="100000" data-hex="#006400">Zelená – ×100 000</option>
+          <option value="1000000" data-hex="#1155EE">Modrá – ×1 000 000</option>
+        </select>
+      </div>
+      <div class="sel-group"><label class="lc5">Tolerance</label>
+        <select id="d5_5" onchange="decode5()">
+          <option value="±10 %" data-hex="#C0C0C0">Stříbrná – ±10 %</option>
+          <option value="±5 %" data-hex="#DAA520">Zlatá – ±5 %</option>
+          <option value="±2 %" data-hex="#EE0000">Červená – ±2 %</option>
+          <option value="±1 %" data-hex="#8B4513" selected>Hnědá – ±1 %</option>
+          <option value="±0,5 %" data-hex="#006400">Zelená – ±0,5 %</option>
+          <option value="±0,25 %" data-hex="#1155EE">Modrá – ±0,25 %</option>
+          <option value="±0,1 %" data-hex="#800080">Fialová – ±0,1 %</option>
+        </select>
+      </div>
+    </div>
+    <div class="res-wrap">
+      <div class="wire"></div>
+      <div class="res-body">
+        <div class="stripe" id="d5v1" style="background:#E8E000;"></div>
+        <div class="stripe" id="d5v2" style="background:#800080;"></div>
+        <div class="stripe" id="d5v3" style="background:#006400;"></div>
+        <div class="gap-sm"></div>
+        <div class="stripe" id="d5v4" style="background:#EE0000;"></div>
+        <div class="gap-xs"></div>
+        <div class="stripe" id="d5v5" style="background:#8B4513;"></div>
+      </div>
+      <div class="wire"></div>
+    </div>
+    <div class="result-pill">
+      <span class="val" id="d5-val">47,5 kΩ</span>
+      <span class="tol" id="d5-tol">tolerance ±1 %</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ TAB 4: DEKODÉR 6 ═══════════════ -->
+<div id="tab-dec6" class="tab-content">
+  <div class="info-box purple" style="margin-bottom:1.25rem;">
+    <strong>6-proužkové:</strong> stejné jako 5-proužkové + 6. proužek = teplotní koeficient (ppm/°C).
+    Typické použití: vojenská elektronika, vědecké přístroje, extrémní teploty.
+  </div>
+  <div class="warn-box">
+    <strong>Klíčové:</strong> 6. proužek (teplotní koeficient) se vyskytuje <strong>výhradně u 6-proužkových rezistorů</strong>.
+    U 5-proužkového 5. proužek = tolerance, konec — žádný teplotní koeficient tam není.
+  </div>
+  <div class="card">
+    <h2>Dekodér — 6 proužků</h2>
+    <div class="selects-grid-6">
+      <div class="sel-group"><label class="lc6">1. číslice</label>
+        <select id="d6_1" onchange="decode6()">
+          <option value="0" data-hex="#111111">Černá – 0</option>
+          <option value="1" data-hex="#8B4513" selected>Hnědá – 1</option>
+          <option value="2" data-hex="#EE0000">Červená – 2</option>
+          <option value="3" data-hex="#FF8C00">Oranžová – 3</option>
+          <option value="4" data-hex="#E8E000">Žlutá – 4</option>
+          <option value="5" data-hex="#006400">Zelená – 5</option>
+          <option value="6" data-hex="#1155EE">Modrá – 6</option>
+          <option value="7" data-hex="#800080">Fialová – 7</option>
+          <option value="8" data-hex="#888888">Šedá – 8</option>
+          <option value="9" data-hex="#dddddd">Bílá – 9</option>
+        </select>
+      </div>
+      <div class="sel-group"><label class="lc6">2. číslice</label>
+        <select id="d6_2" onchange="decode6()">
+          <option value="0" data-hex="#111111">Černá – 0</option>
+          <option value="1" data-hex="#8B4513">Hnědá – 1</option>
+          <option value="2" data-hex="#EE0000">Červená – 2</option>
+          <option value="3" data-hex="#FF8C00">Oranžová – 3</option>
+          <option value="4" data-hex="#E8E000">Žlutá – 4</option>
+          <option value="5" data-hex="#006400" selected>Zelená – 5</option>
+          <option value="6" data-hex="#1155EE">Modrá – 6</option>
+          <option value="7" data-hex="#800080">Fialová – 7</option>
+          <option value="8" data-hex="#888888">Šedá – 8</option>
+          <option value="9" data-hex="#dddddd">Bílá – 9</option>
+        </select>
+      </div>
+      <div class="sel-group"><label class="lc6">3. číslice</label>
+        <select id="d6_3" onchange="decode6()">
+          <option value="0" data-hex="#111111">Černá – 0</option>
+          <option value="1" data-hex="#8B4513">Hnědá – 1</option>
+          <option value="2" data-hex="#EE0000">Červená – 2</option>
+          <option value="3" data-hex="#FF8C00">Oranžová – 3</option>
+          <option value="4" data-hex="#E8E000">Žlutá – 4</option>
+          <option value="5" data-hex="#006400">Zelená – 5</option>
+          <option value="6" data-hex="#1155EE">Modrá – 6</option>
+          <option value="7" data-hex="#800080">Fialová – 7</option>
+          <option value="8" data-hex="#888888" selected>Šedá – 8</option>
+          <option value="9" data-hex="#dddddd">Bílá – 9</option>
+        </select>
+      </div>
+      <div class="sel-group"><label class="lc6">Násobitel</label>
+        <select id="d6_4" onchange="decode6()">
+          <option value="0.01" data-hex="#C0C0C0">Stříbrná – ×0,01</option>
+          <option value="0.1" data-hex="#DAA520">Zlatá – ×0,1</option>
+          <option value="1" data-hex="#111111">Černá – ×1</option>
+          <option value="10" data-hex="#8B4513">Hnědá – ×10</option>
+          <option value="100" data-hex="#EE0000" selected>Červená – ×100</option>
+          <option value="1000" data-hex="#FF8C00">Oranžová – ×1 000</option>
+          <option value="10000" data-hex="#E8E000">Žlutá – ×10 000</option>
+          <option value="100000" data-hex="#006400">Zelená – ×100 000</option>
+          <option value="1000000" data-hex="#1155EE">Modrá – ×1 000 000</option>
+        </select>
+      </div>
+      <div class="sel-group"><label class="lc6">Tolerance</label>
+        <select id="d6_5" onchange="decode6()">
+          <option value="±10 %" data-hex="#C0C0C0">Stříbrná – ±10 %</option>
+          <option value="±5 %" data-hex="#DAA520">Zlatá – ±5 %</option>
+          <option value="±2 %" data-hex="#EE0000">Červená – ±2 %</option>
+          <option value="±1 %" data-hex="#8B4513" selected>Hnědá – ±1 %</option>
+          <option value="±0,5 %" data-hex="#006400">Zelená – ±0,5 %</option>
+          <option value="±0,25 %" data-hex="#1155EE">Modrá – ±0,25 %</option>
+          <option value="±0,1 %" data-hex="#800080">Fialová – ±0,1 %</option>
+        </select>
+      </div>
+      <div class="sel-group"><label class="lc6">Tepl. koeficient</label>
+        <select id="d6_6" onchange="decode6()">
+          <option value="100 ppm/°C" data-hex="#8B4513">Hnědá – 100 ppm/°C</option>
+          <option value="50 ppm/°C" data-hex="#EE0000" selected>Červená – 50 ppm/°C</option>
+          <option value="15 ppm/°C" data-hex="#FF8C00">Oranžová – 15 ppm/°C</option>
+          <option value="25 ppm/°C" data-hex="#E8E000">Žlutá – 25 ppm/°C</option>
+          <option value="10 ppm/°C" data-hex="#1155EE">Modrá – 10 ppm/°C</option>
+          <option value="5 ppm/°C" data-hex="#800080">Fialová – 5 ppm/°C</option>
+        </select>
+      </div>
+    </div>
+    <div class="res-wrap">
+      <div class="wire"></div>
+      <div class="res-body">
+        <div class="stripe" id="d6v1" style="background:#8B4513;"></div>
+        <div class="stripe" id="d6v2" style="background:#006400;"></div>
+        <div class="stripe" id="d6v3" style="background:#888888;"></div>
+        <div class="gap-sm"></div>
+        <div class="stripe" id="d6v4" style="background:#EE0000;"></div>
+        <div class="gap-xs"></div>
+        <div class="stripe" id="d6v5" style="background:#8B4513;"></div>
+        <div class="gap-xs"></div>
+        <div class="stripe" id="d6v6" style="background:#EE0000;"></div>
+      </div>
+      <div class="wire"></div>
+    </div>
+    <div class="result-pill">
+      <span class="val" id="d6-val">15,8 kΩ</span>
+      <span class="tol" id="d6-tol">tolerance ±1 %</span>
+      <span class="tempco" id="d6-tc">50 ppm/°C</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ TAB 5: CVIČENÍ 4 ═══════════════ -->
+<div id="tab-quiz4" class="tab-content">
+  <div class="info-box yellow" style="margin-bottom:1.25rem;">
+    <strong>4-proužkové cvičení:</strong> 1. a 2. proužek = číslice · 3. = násobitel · 4. = tolerance.
+  </div>
+  <div id="quiz4-wrap">
+    <div class="progress-txt" id="q4-prog">Příklad 1/8</div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="q4-bar" style="width:12.5%"></div></div>
+    <div class="card">
+      <p id="q4-text" style="font-size:14px;color:var(--muted);margin-bottom:0.25rem;"></p>
+      <div class="res-wrap"><div class="wire"></div><div class="res-body" id="q4-res"></div><div class="wire"></div></div>
+      <div class="stripe-row" id="q4-lbl"></div>
+      <div class="opts-grid" id="q4-opts"></div>
+      <div class="feedback-box" id="q4-fb"></div>
+      <button class="next-btn" id="q4-next" onclick="nextQ4()">Další příklad →</button>
+    </div>
+  </div>
+  <div class="score-card" id="score4-card">
+    <div class="score-num" id="score4-num"></div>
+    <div class="score-label" id="score4-label"></div>
+    <br><button class="restart-btn" onclick="restartQuiz4()">Zkusit znovu</button>
+  </div>
+</div>
+
+<!-- ═══════════════ TAB 6: CVIČENÍ 5 ═══════════════ -->
+<div id="tab-quiz5" class="tab-content">
+  <div class="info-box blue" style="margin-bottom:1.25rem;">
+    <strong>5-proužkové cvičení:</strong> 1.–3. = číslice · 4. = násobitel · 5. = tolerance. Pozor — 3. proužek je číslice!
+  </div>
+  <div id="quiz5-wrap">
+    <div class="progress-txt" id="q5-prog">Příklad 1/8</div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="q5-bar" style="width:12.5%"></div></div>
+    <div class="card">
+      <p id="q5-text" style="font-size:14px;color:var(--muted);margin-bottom:0.25rem;"></p>
+      <div class="res-wrap"><div class="wire"></div><div class="res-body" id="q5-res"></div><div class="wire"></div></div>
+      <div class="stripe-row" id="q5-lbl"></div>
+      <div class="opts-grid" id="q5-opts"></div>
+      <div class="feedback-box" id="q5-fb"></div>
+      <button class="next-btn" id="q5-next" onclick="nextQ5()">Další příklad →</button>
+    </div>
+  </div>
+  <div class="score-card" id="score5-card">
+    <div class="score-num" id="score5-num"></div>
+    <div class="score-label" id="score5-label"></div>
+    <br><button class="restart-btn" onclick="restartQuiz5()">Zkusit znovu</button>
+  </div>
+</div>
+
+<!-- ═══════════════ TAB 7: CVIČENÍ 6 ═══════════════ -->
+<div id="tab-quiz6" class="tab-content">
+  <div class="info-box purple" style="margin-bottom:1.25rem;">
+    <strong>6-proužkové cvičení (pokročilé):</strong> Střídají se otázky na hodnotu odporu a na teplotní koeficient (6. proužek).
+  </div>
+  <div id="quiz6-wrap">
+    <div class="progress-txt" id="q6-prog">Příklad 1/8</div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="q6-bar" style="width:12.5%"></div></div>
+    <div class="card">
+      <p id="q6-text" style="font-size:14px;color:var(--muted);margin-bottom:0.25rem;"></p>
+      <div class="res-wrap"><div class="wire"></div><div class="res-body" id="q6-res"></div><div class="wire"></div></div>
+      <div class="stripe-row" id="q6-lbl"></div>
+      <div class="opts-grid" id="q6-opts"></div>
+      <div class="feedback-box" id="q6-fb"></div>
+      <button class="next-btn" id="q6-next" onclick="nextQ6()">Další příklad →</button>
+    </div>
+  </div>
+  <div class="score-card" id="score6-card">
+    <div class="score-num" id="score6-num"></div>
+    <div class="score-label" id="score6-label"></div>
+    <br><button class="restart-btn" onclick="restartQuiz6()">Zkusit znovu</button>
+  </div>
+</div>
+
+<!-- ═══════════════ TAB 8: TISKOVÝ TAHÁK ═══════════════ -->
+<div id="tab-tahak" class="tab-content">
+  <button class="print-btn" onclick="window.print()">🖨️ Vytisknout tahák (A4)</button>
+
+  <div class="card">
+    <h2>Co se vytiskne?</h2>
+    <p style="font-size:14px;color:var(--muted);line-height:1.8;margin-bottom:1rem;">
+      Po kliknutí na tlačítko se otevře tiskový dialog. Vytiskne se čistý tahák formátu A4 s:
+    </p>
+    <ul style="font-size:14px;color:var(--muted);padding-left:1.25rem;line-height:2;">
+      <li>Strukturou proužků pro 4, 5 a 6-proužkové rezistory</li>
+      <li>Výrazným upozorněním na pravidlo 3. proužku a teplotního koeficientu</li>
+      <li>Kompletní tabulkou barev (číslice, násobitel, tolerance, teplotní koeficient)</li>
+      <li>5 vzorových příkladů čtení (4, 5 i 6-proužkové)</li>
+    </ul>
+    <p style="font-size:13px;color:var(--muted);margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
+      Tip: V tiskovém dialogu zvol "Barevný tisk" — barevné vzorky v tabulce jsou pak čitelnější.
+      Funguje i černobíle, ale barvy jsou pak jen popsány textem.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Náhled obsahu taháku</h2>
+    <div style="background:var(--surface2);border-radius:8px;padding:1.25rem;font-size:13px;color:var(--muted);line-height:1.9;">
+      <strong style="color:var(--text);font-family:'Space Mono',monospace;">BAREVNÉ ZNAČENÍ REZISTORŮ — TAHÁK</strong><br><br>
+      <strong style="color:var(--accent);">Struktura proužků</strong><br>
+      4-proužkový: číslice · číslice · násobitel · tolerance<br>
+      5-proužkový: číslice · číslice · číslice · násobitel · tolerance<br>
+      6-proužkový: číslice · číslice · číslice · násobitel · tolerance · <span style="color:var(--purple);">tepl. koef.</span><br><br>
+      <strong style="color:var(--red);">⚠ 3. proužek u 5-proužkového = vždy 3. číslice. Teplotní koef. = pouze 6. proužek u 6-proužkových.</strong><br><br>
+      <strong style="color:var(--accent);">Tabulka barev</strong> — všechny barvy s hodnotami číslice / násobitel / tolerance / tepl. koef.<br><br>
+      <strong style="color:var(--accent);">5 vzorových příkladů</strong> — 2× 4-proužkový, 2× 5-proužkový, 1× 6-proužkový
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const COLORS = {
+  stribrna: { hex:'#C0C0C0', label:'stříbrná', digit:null, mult:0.01,      tol:'±10 %',   tc:null },
+  zlata:    { hex:'#DAA520', label:'zlatá',     digit:null, mult:0.1,       tol:'±5 %',    tc:null },
+  cerna:    { hex:'#111111', label:'černá',     digit:0,    mult:1,         tol:null,       tc:null },
+  hneda:    { hex:'#8B4513', label:'hnědá',     digit:1,    mult:10,        tol:'±1 %',    tc:'100 ppm/°C' },
+  cervena:  { hex:'#EE0000', label:'červená',   digit:2,    mult:100,       tol:'±2 %',    tc:'50 ppm/°C'  },
+  oranzova: { hex:'#FF8C00', label:'oranžová',  digit:3,    mult:1000,      tol:null,       tc:'15 ppm/°C'  },
+  zluta:    { hex:'#E8E000', label:'žlutá',     digit:4,    mult:10000,     tol:null,       tc:'25 ppm/°C'  },
+  zelena:   { hex:'#006400', label:'zelená',    digit:5,    mult:100000,    tol:'±0,5 %',  tc:null         },
+  modra:    { hex:'#1155EE', label:'modrá',     digit:6,    mult:1000000,   tol:'±0,25 %', tc:'10 ppm/°C'  },
+  fialova:  { hex:'#800080', label:'fialová',   digit:7,    mult:10000000,  tol:'±0,1 %',  tc:'5 ppm/°C'   },
+  seda:     { hex:'#888888', label:'šedá',      digit:8,    mult:100000000, tol:null,       tc:null         },
+  bila:     { hex:'#dddddd', label:'bílá',      digit:9,    mult:null,      tol:'±20 %',   tc:null         },
+};
+
+// ─── COLOR TABLE (screen) ─────────────────────────────────────────────────────
+const tblRows = [
+  ['stribrna','–','×0,01','±10 %','–'],    ['zlata','–','×0,1','±5 %','–'],
+  ['cerna','0','×1','–','–'],               ['hneda','1','×10','±1 %','100 ppm/°C'],
+  ['cervena','2','×100','±2 %','50 ppm/°C'],['oranzova','3','×1 000','–','15 ppm/°C'],
+  ['zluta','4','×10 000','–','25 ppm/°C'],  ['zelena','5','×100 000','±0,5 %','–'],
+  ['modra','6','×1 000 000','±0,25 %','10 ppm/°C'],['fialova','7','×10 000 000','±0,1 %','5 ppm/°C'],
+  ['seda','8','×100 000 000','–','–'],      ['bila','9','–','±20 %','–'],
+];
+
+function buildColorTable(tbodyId) {
+  const tbl = document.getElementById(tbodyId);
+  if (!tbl) return;
+  tblRows.forEach(([key,d,m,t,tc]) => {
+    const c = COLORS[key];
+    const tr = document.createElement('tr');
+    tr.style.borderTop = '1px solid var(--border)';
+    tr.innerHTML = `
+      <td style="padding:5px 8px;display:flex;align-items:center;gap:8px;">
+        <span style="width:24px;height:12px;border-radius:2px;background:${c.hex};border:1px solid rgba(255,255,255,0.15);display:inline-block;flex-shrink:0;"></span>
+        <span>${c.label}</span></td>
+      <td style="text-align:center;padding:5px 8px;color:var(--muted);">${d}</td>
+      <td style="text-align:center;padding:5px 8px;color:var(--muted);">${m}</td>
+      <td style="text-align:center;padding:5px 8px;color:var(--muted);">${t}</td>
+      <td style="text-align:center;padding:5px 8px;color:${tc!=='–'?'var(--purple)':'var(--muted)'};">${tc}</td>`;
+    tbl.appendChild(tr);
+  });
+}
+buildColorTable('color-table');
+
+// ─── COLOR TABLE (print) ──────────────────────────────────────────────────────
+const ptData = [
+  ['#C0C0C0','stříbrná','–','×0,01','±10 %','–'],
+  ['#DAA520','zlatá','–','×0,1','±5 %','–'],
+  ['#111111','černá','0','×1','–','–'],
+  ['#8B4513','hnědá','1','×10','±1 %','100 ppm/°C'],
+  ['#EE0000','červená','2','×100','±2 %','50 ppm/°C'],
+  ['#FF8C00','oranžová','3','×1 000','–','15 ppm/°C'],
+  ['#E8E000','žlutá','4','×10 000','–','25 ppm/°C'],
+  ['#006400','zelená','5','×100 000','±0,5 %','–'],
+  ['#1155EE','modrá','6','×1 000 000','±0,25 %','10 ppm/°C'],
+  ['#800080','fialová','7','×10 000 000','±0,1 %','5 ppm/°C'],
+  ['#888888','šedá','8','×100 000 000','–','–'],
+  ['#dddddd','bílá','9','–','±20 %','–'],
+];
+const ptTbody = document.getElementById('pt-color-tbody');
+ptData.forEach(([hex,name,d,m,t,tc], i) => {
+  const tr = document.createElement('tr');
+  if (i % 2 === 1) tr.style.background = '#f7f7f7';
+  tr.innerHTML = `
+    <td style="padding:3pt 5pt;">
+      <span class="pt-color-swatch" style="background:${hex};"></span>${name}
+    </td>
+    <td style="text-align:center;padding:3pt 5pt;">${d}</td>
+    <td style="text-align:center;padding:3pt 5pt;">${m}</td>
+    <td style="text-align:center;padding:3pt 5pt;">${t}</td>
+    <td style="text-align:center;padding:3pt 5pt;${tc!=='–'?'font-weight:600;':''}">${tc}</td>`;
+  ptTbody.appendChild(tr);
+});
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function getHex(selId) {
+  const s = document.getElementById(selId);
+  return s.options[s.selectedIndex].getAttribute('data-hex');
+}
+
+function fmtOhm(v) {
+  if (v >= 1e6) {
+    const r = v / 1e6;
+    return (Number.isInteger(r) ? r : parseFloat(r.toFixed(3))) + ' MΩ';
+  }
+  if (v >= 1e3) {
+    const r = v / 1e3;
+    return (Number.isInteger(r) ? r : parseFloat(r.toFixed(3))) + ' kΩ';
+  }
+  return v + ' Ω';
+}
+
+// ─── DECODERS ────────────────────────────────────────────────────────────────
+function decode4() {
+  ['1','2','3','4'].forEach(i =>
+    document.getElementById('d4v'+i).style.background = getHex('d4_'+i));
+  const v = (parseInt(document.getElementById('d4_1').value) * 10
+           + parseInt(document.getElementById('d4_2').value))
+           * parseFloat(document.getElementById('d4_3').value);
+  document.getElementById('d4-val').textContent = fmtOhm(v);
+  document.getElementById('d4-tol').textContent = 'tolerance ' + document.getElementById('d4_4').value;
+}
+
+function decode5() {
+  ['1','2','3','4','5'].forEach(i =>
+    document.getElementById('d5v'+i).style.background = getHex('d5_'+i));
+  const v = (parseInt(document.getElementById('d5_1').value) * 100
+           + parseInt(document.getElementById('d5_2').value) * 10
+           + parseInt(document.getElementById('d5_3').value))
+           * parseFloat(document.getElementById('d5_4').value);
+  document.getElementById('d5-val').textContent = fmtOhm(v);
+  document.getElementById('d5-tol').textContent = 'tolerance ' + document.getElementById('d5_5').value;
+}
+
+function decode6() {
+  ['1','2','3','4','5','6'].forEach(i =>
+    document.getElementById('d6v'+i).style.background = getHex('d6_'+i));
+  const v = (parseInt(document.getElementById('d6_1').value) * 100
+           + parseInt(document.getElementById('d6_2').value) * 10
+           + parseInt(document.getElementById('d6_3').value))
+           * parseFloat(document.getElementById('d6_4').value);
+  document.getElementById('d6-val').textContent = fmtOhm(v);
+  document.getElementById('d6-tol').textContent = 'tolerance ' + document.getElementById('d6_5').value;
+  document.getElementById('d6-tc').textContent = document.getElementById('d6_6').value;
+}
+
+// ─── QUIZ DATA ────────────────────────────────────────────────────────────────
+const Q4 = [
+  { s:['hneda','cerna','oranzova','zlata'],       q:'Přečti hodnotu tohoto rezistoru:' },
+  { s:['cervena','cervena','cervena','hneda'],     q:'Jaká je hodnota tohoto rezistoru?' },
+  { s:['zluta','fialova','oranzova','stribrna'],   q:'Přečti hodnotu tohoto rezistoru:' },
+  { s:['hneda','zelena','cervena','zlata'],        q:'Jaká je hodnota tohoto rezistoru?' },
+  { s:['oranzova','cerna','hneda','zlata'],        q:'Přečti hodnotu tohoto rezistoru:' },
+  { s:['zelena','modra','zelena','cervena'],       q:'Jaká je hodnota tohoto rezistoru?' },
+  { s:['cervena','fialova','oranzova','stribrna'], q:'Přečti hodnotu tohoto rezistoru:' },
+  { s:['hneda','cerna','cerna','zlata'],           q:'Jaká je hodnota tohoto rezistoru?' },
+];
+
+const Q5 = [
+  { s:['hneda','cerna','cerna','cerna','hneda'],         q:'Přečti hodnotu tohoto 5-proužkového rezistoru:' },
+  { s:['cervena','cervena','cerna','cervena','cervena'],  q:'Jaká je hodnota tohoto rezistoru?' },
+  { s:['oranzova','oranzova','cerna','cervena','hneda'],  q:'Přečti hodnotu tohoto rezistoru:' },
+  { s:['hneda','zelena','cerna','cerna','hneda'],         q:'Jaká je hodnota tohoto rezistoru?' },
+  { s:['zelena','modra','cerna','oranzova','cervena'],    q:'Přečti hodnotu tohoto rezistoru:' },
+  { s:['cervena','hneda','zelena','cervena','hneda'],     q:'Jaká je hodnota tohoto rezistoru?' },
+  { s:['zluta','fialova','cerna','oranzova','hneda'],     q:'Přečti hodnotu tohoto rezistoru:' },
+  { s:['hneda','cerna','cerna','zluta','hneda'],          q:'Jaká je hodnota tohoto rezistoru?' },
+];
+
+const Q6 = [
+  { s:['hneda','zelena','seda','cervena','hneda','cervena'],    qtype:'val', q:'Jaká je hodnota odporu tohoto 6-proužkového rezistoru?' },
+  { s:['cervena','fialova','cerna','oranzova','hneda','modra'], qtype:'tc',  q:'Jaký je teplotní koeficient tohoto rezistoru? (6. proužek)' },
+  { s:['oranzova','oranzova','cerna','cervena','hneda','hneda'],qtype:'val', q:'Přečti hodnotu odporu tohoto rezistoru:' },
+  { s:['zelena','modra','cerna','oranzova','cervena','oranzova'],qtype:'tc', q:'Jaký je teplotní koeficient tohoto rezistoru?' },
+  { s:['hneda','cerna','cerna','oranzova','hneda','fialova'],   qtype:'val', q:'Jaká je hodnota odporu tohoto rezistoru?' },
+  { s:['cervena','cervena','cerna','cervena','hneda','cervena'],qtype:'tc',  q:'Jaký je teplotní koeficient tohoto rezistoru?' },
+  { s:['zluta','fialova','zelena','cervena','hneda','modra'],   qtype:'val', q:'Přečti hodnotu odporu tohoto rezistoru:' },
+  { s:['hneda','zelena','cerna','hneda','hneda','zluta'],       qtype:'tc',  q:'Jaký je teplotní koeficient tohoto rezistoru?' },
+];
+
+// ─── CALC ────────────────────────────────────────────────────────────────────
+function calcQ4(q) {
+  return {
+    val: (COLORS[q.s[0]].digit * 10 + COLORS[q.s[1]].digit) * COLORS[q.s[2]].mult,
+    tol: COLORS[q.s[3]].tol
+  };
+}
+function calcQ5(q) {
+  return {
+    val: (COLORS[q.s[0]].digit * 100 + COLORS[q.s[1]].digit * 10 + COLORS[q.s[2]].digit) * COLORS[q.s[3]].mult,
+    tol: COLORS[q.s[4]].tol
+  };
+}
+function calcQ6(q) {
+  return {
+    val: (COLORS[q.s[0]].digit * 100 + COLORS[q.s[1]].digit * 10 + COLORS[q.s[2]].digit) * COLORS[q.s[3]].mult,
+    tol: COLORS[q.s[4]].tol,
+    tc:  COLORS[q.s[5]].tc
+  };
+}
+
+// ─── OPTIONS ─────────────────────────────────────────────────────────────────
+function makeValOpts(correct) {
+  let opts = [correct];
+  const alts = [correct*10, Math.round(correct/10), correct*100,
+                Math.round(correct/100), correct*2, Math.round(correct*5)];
+  for (let a of alts) {
+    if (a > 0 && a !== correct && opts.length < 4) opts.push(a);
+  }
+  while (opts.length < 4) opts.push(correct * (opts.length + 3));
+  return opts.slice(0,4).sort(() => Math.random() - 0.5);
+}
+
+const TC_OPTS = ['5 ppm/°C','10 ppm/°C','15 ppm/°C','25 ppm/°C','50 ppm/°C','100 ppm/°C'];
+function makeTcOpts(correct) {
+  let pool = TC_OPTS.filter(x => x !== correct).sort(() => Math.random() - 0.5);
+  return [correct, pool[0], pool[1], pool[2]].sort(() => Math.random() - 0.5);
+}
+
+// ─── RENDER RESISTOR ─────────────────────────────────────────────────────────
+function renderResistor(stripes, resId, lblId, labelNames) {
+  const res = document.getElementById(resId);
+  res.innerHTML = '';
+  const mainGap = stripes.length === 4 ? 2 : 3;
+
+  stripes.forEach((k, i) => {
+    if (i === mainGap) {
+      const g = document.createElement('div'); g.className = 'gap-sm'; res.appendChild(g);
+    } else if (i > mainGap) {
+      const g = document.createElement('div'); g.className = 'gap-xs'; res.appendChild(g);
+    }
+    const s = document.createElement('div');
+    s.className = 'stripe';
+    s.style.background = COLORS[k].hex;
+    res.appendChild(s);
+  });
+
+  const lbl = document.getElementById(lblId);
+  lbl.innerHTML = '';
+  stripes.forEach((k, i) => {
+    const col = document.createElement('div');
+    col.className = 'stripe-col';
+    if (i >= mainGap) col.style.marginLeft = '6px';
+    col.innerHTML = `<div class="mini" style="background:${COLORS[k].hex};"></div><div class="lbl">${labelNames[i]}</div>`;
+    lbl.appendChild(col);
+  });
+}
+
+// ─── SHARED CHECK ────────────────────────────────────────────────────────────
+function checkAnsGeneric(btn, chosen, correct, okMsg, failMsg, optsId, fbId, nextId) {
+  document.querySelectorAll('#' + optsId + ' .opt').forEach(b => {
+    b.disabled = true;
+    if (b.textContent === correct) b.classList.add('correct');
+  });
+  const fb = document.getElementById(fbId);
+  if (chosen === correct) {
+    btn.classList.add('correct');
+    fb.textContent = okMsg;
+    fb.className = 'feedback-box ok';
+  } else {
+    btn.classList.add('wrong');
+    fb.textContent = failMsg;
+    fb.className = 'feedback-box fail';
+  }
+  document.getElementById(nextId).className = 'next-btn show';
+}
+
+function scoreMsg(s, total) {
+  const msgs = ['Zkus to znovu, nevzdávej se!','Dobrý začátek, pokračuj!','Dobrá práce!','Výborně, zvládl jsi to!','Perfektní skóre!'];
+  return msgs[Math.floor(s / total * 4)];
+}
+
+// ─── QUIZ 4 ──────────────────────────────────────────────────────────────────
+let qi4 = 0, score4 = 0, ans4 = false;
+const names4 = ['1. číslice','2. číslice','násobitel','tolerance'];
+
+function renderQ4() {
+  if (qi4 >= Q4.length) { showScore4(); return; }
+  ans4 = false;
+  const q = Q4[qi4];
+  const { val, tol } = calcQ4(q);
+  document.getElementById('q4-prog').textContent = 'Příklad ' + (qi4+1) + '/' + Q4.length;
+  document.getElementById('q4-bar').style.width = ((qi4+1)/Q4.length*100) + '%';
+  document.getElementById('q4-text').textContent = q.q;
+  renderResistor(q.s, 'q4-res', 'q4-lbl', names4);
+  const opts = makeValOpts(val);
+  const og = document.getElementById('q4-opts');
+  og.innerHTML = '';
+  opts.forEach(v => {
+    const b = document.createElement('button');
+    b.className = 'opt';
+    b.textContent = fmtOhm(v);
+    b.onclick = () => {
+      if (ans4) return; ans4 = true;
+      if (v === val) score4++;
+      checkAnsGeneric(b, fmtOhm(v), fmtOhm(val),
+        'Správně! Hodnota je ' + fmtOhm(val) + (tol ? ', tolerance ' + tol : '') + '.',
+        'Bohužel ne. Správná odpověď je ' + fmtOhm(val) + (tol ? ' (tolerance ' + tol + ')' : '') + '.',
+        'q4-opts','q4-fb','q4-next');
+    };
+    og.appendChild(b);
+  });
+  document.getElementById('q4-fb').className = 'feedback-box';
+  document.getElementById('q4-next').className = 'next-btn';
+}
+function nextQ4() { qi4++; renderQ4(); }
+function showScore4() {
+  document.getElementById('quiz4-wrap').style.display = 'none';
+  document.getElementById('score4-card').className = 'score-card show';
+  document.getElementById('score4-num').textContent = score4 + '/' + Q4.length;
+  document.getElementById('score4-label').textContent = scoreMsg(score4, Q4.length);
+}
+function restartQuiz4() {
+  qi4 = 0; score4 = 0; ans4 = false;
+  document.getElementById('quiz4-wrap').style.display = 'block';
+  document.getElementById('score4-card').className = 'score-card';
+  renderQ4();
+}
+
+// ─── QUIZ 5 ──────────────────────────────────────────────────────────────────
+let qi5 = 0, score5 = 0, ans5 = false;
+const names5 = ['1. číslice','2. číslice','3. číslice','násobitel','tolerance'];
+
+function renderQ5() {
+  if (qi5 >= Q5.length) { showScore5(); return; }
+  ans5 = false;
+  const q = Q5[qi5];
+  const { val, tol } = calcQ5(q);
+  document.getElementById('q5-prog').textContent = 'Příklad ' + (qi5+1) + '/' + Q5.length;
+  document.getElementById('q5-bar').style.width = ((qi5+1)/Q5.length*100) + '%';
+  document.getElementById('q5-text').textContent = q.q;
+  renderResistor(q.s, 'q5-res', 'q5-lbl', names5);
+  const opts = makeValOpts(val);
+  const og = document.getElementById('q5-opts');
+  og.innerHTML = '';
+  opts.forEach(v => {
+    const b = document.createElement('button');
+    b.className = 'opt';
+    b.textContent = fmtOhm(v);
+    b.onclick = () => {
+      if (ans5) return; ans5 = true;
+      if (v === val) score5++;
+      checkAnsGeneric(b, fmtOhm(v), fmtOhm(val),
+        'Správně! Hodnota je ' + fmtOhm(val) + (tol ? ', tolerance ' + tol : '') + '.',
+        'Bohužel ne. Správná odpověď je ' + fmtOhm(val) + (tol ? ' (tolerance ' + tol + ')' : '') + '.',
+        'q5-opts','q5-fb','q5-next');
+    };
+    og.appendChild(b);
+  });
+  document.getElementById('q5-fb').className = 'feedback-box';
+  document.getElementById('q5-next').className = 'next-btn';
+}
+function nextQ5() { qi5++; renderQ5(); }
+function showScore5() {
+  document.getElementById('quiz5-wrap').style.display = 'none';
+  document.getElementById('score5-card').className = 'score-card show';
+  document.getElementById('score5-num').textContent = score5 + '/' + Q5.length;
+  document.getElementById('score5-label').textContent = scoreMsg(score5, Q5.length);
+}
+function restartQuiz5() {
+  qi5 = 0; score5 = 0; ans5 = false;
+  document.getElementById('quiz5-wrap').style.display = 'block';
+  document.getElementById('score5-card').className = 'score-card';
+  renderQ5();
+}
+
+// ─── QUIZ 6 ──────────────────────────────────────────────────────────────────
+let qi6 = 0, score6 = 0, ans6 = false;
+const names6 = ['1. číslice','2. číslice','3. číslice','násobitel','tolerance','tepl. koef.'];
+
+function renderQ6() {
+  if (qi6 >= Q6.length) { showScore6(); return; }
+  ans6 = false;
+  const q = Q6[qi6];
+  const { val, tol, tc } = calcQ6(q);
+  document.getElementById('q6-prog').textContent = 'Příklad ' + (qi6+1) + '/' + Q6.length;
+  document.getElementById('q6-bar').style.width = ((qi6+1)/Q6.length*100) + '%';
+  document.getElementById('q6-text').textContent = q.q;
+  renderResistor(q.s, 'q6-res', 'q6-lbl', names6);
+
+  let opts, correctStr;
+  if (q.qtype === 'val') {
+    opts = makeValOpts(val).map(v => ({ label: fmtOhm(v), correct: v === val }));
+    correctStr = fmtOhm(val);
+  } else {
+    opts = makeTcOpts(tc).map(v => ({ label: v, correct: v === tc }));
+    correctStr = tc;
+  }
+
+  const og = document.getElementById('q6-opts');
+  og.innerHTML = '';
+  opts.forEach(opt => {
+    const b = document.createElement('button');
+    b.className = 'opt';
+    b.textContent = opt.label;
+    b.onclick = () => {
+      if (ans6) return; ans6 = true;
+      if (opt.correct) score6++;
+      const okMsg = q.qtype === 'val'
+        ? 'Správně! Hodnota je ' + fmtOhm(val) + (tol ? ', tolerance ' + tol : '') + '.'
+        : 'Správně! Teplotní koeficient je ' + tc + '. Barva 6. proužku: ' + COLORS[q.s[5]].label + '.';
+      const failMsg = q.qtype === 'val'
+        ? 'Bohužel ne. Správná hodnota je ' + fmtOhm(val) + '.'
+        : 'Bohužel ne. Správný teplotní koeficient je ' + tc + ' (barva: ' + COLORS[q.s[5]].label + ').';
+      checkAnsGeneric(b, opt.label, correctStr, okMsg, failMsg, 'q6-opts','q6-fb','q6-next');
+    };
+    og.appendChild(b);
+  });
+  document.getElementById('q6-fb').className = 'feedback-box';
+  document.getElementById('q6-next').className = 'next-btn';
+}
+function nextQ6() { qi6++; renderQ6(); }
+function showScore6() {
+  document.getElementById('quiz6-wrap').style.display = 'none';
+  document.getElementById('score6-card').className = 'score-card show';
+  document.getElementById('score6-num').textContent = score6 + '/' + Q6.length;
+  document.getElementById('score6-label').textContent = scoreMsg(score6, Q6.length);
+}
+function restartQuiz6() {
+  qi6 = 0; score6 = 0; ans6 = false;
+  document.getElementById('quiz6-wrap').style.display = 'block';
+  document.getElementById('score6-card').className = 'score-card';
+  renderQ6();
+}
+
+// ─── TAB SWITCHING ────────────────────────────────────────────────────────────
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'quiz4' && qi4 === 0 && !ans4) renderQ4();
+  if (name === 'quiz5' && qi5 === 0 && !ans5) renderQ5();
+  if (name === 'quiz6' && qi6 === 0 && !ans6) renderQ6();
+}
+</script>
+</body>
+</html>
